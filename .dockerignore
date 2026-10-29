@@ -1,0 +1,67 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun.lockb
+
+# Testing
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Next.js
+.next
+out
+.swc
+
+# Production
+build
+dist
+
+# Misc
+.DS_Store
+*.pem
+.vscode
+.idea
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation
+docs
+README.md
+*.md
+
+# Design files
+design-htmls
+
+# Mock data
+src/mocks
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
