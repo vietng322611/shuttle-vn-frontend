@@ -1,8 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { vi } from "date-fns/locale";
 import { isAxiosError } from "axios";
+
+import type { BookingAdminDetail, BookingDetail, InvoiceDetail, PaymentAttempt, PayInvoice, RevenueGroupBy } from "@/types";
 
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
@@ -42,12 +44,41 @@ export function hasBookingEnded(date: string, endTime: string): boolean {
   return new Date(`${date}T${endTime}:00+07:00`).getTime() <= Date.now();
 }
 
+export function isBeforeBookingChangeDeadline(date: string, startTime: string, now = Date.now()): boolean {
+  return new Date(`${date}T${startTime.slice(0, 5)}:00+07:00`).getTime() - now >= 3600000;
+}
+
+export function canRescheduleBooking(
+  booking: BookingDetail | BookingAdminDetail,
+  isStaff = false,
+  now = Date.now()
+): boolean {
+  return (booking.status === "Pending" || booking.status === "Confirmed") &&
+    (isStaff || (booking.paymentStatus ?? booking.invoice?.status) !== "Paid") &&
+    isBeforeBookingChangeDeadline(booking.date, booking.startTime, now);
+}
+
 export function toISODate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
 export function getTodayISO(): string {
   return toISODate(new Date());
+}
+
+export function getTodayVN(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(new Date());
+}
+
+export function formatRevenuePeriod(
+  periodStart: string,
+  groupBy: RevenueGroupBy
+): string {
+  return format(parseISO(periodStart), groupBy === "Month" ? "MM/yyyy" : "dd/MM/yyyy", {
+    locale: vi,
+  });
 }
 
 interface ApiErrorBody {
@@ -79,6 +110,33 @@ export function calcHourDiff(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
   return (eh * 60 + em - (sh * 60 + sm)) / 60;
+}
+
+export function buildPaymentPayload(invoice: InvoiceDetail, amount: number, paymentMethod: "Cash" | "Bank", paidAt: string, now = Date.now()): PayInvoice {
+  if (!invoice.invoiceId || invoice.status !== "Unpaid" || !invoice.expectedState) {
+    throw new Error("Hóa đơn không thể thu tiền. Vui lòng tải lại dữ liệu.");
+  }
+  if (!Number.isFinite(amount) || amount < 0 || amount !== invoice.totalCost) {
+    throw new Error("Số tiền thực thu phải bằng đúng tổng hóa đơn.");
+  }
+  const time = new Date(paidAt).getTime();
+  if (!Number.isFinite(time) || time > now) {
+    throw new Error("Thời điểm thực thu không hợp lệ hoặc nằm trong tương lai.");
+  }
+  return { expectedState: invoice.expectedState, amount, paymentMethod, paidAt: new Date(time).toISOString() };
+}
+
+export function getPaymentAttempt(id: string): PaymentAttempt | null {
+  const saved = sessionStorage.getItem(`invoice-payment:${id}`);
+  return saved ? JSON.parse(saved) as PaymentAttempt : null;
+}
+
+export function savePaymentAttempt(attempt: PaymentAttempt) {
+  sessionStorage.setItem(`invoice-payment:${attempt.id}`, JSON.stringify(attempt));
+}
+
+export function clearPaymentAttempt(id: string) {
+  sessionStorage.removeItem(`invoice-payment:${id}`);
 }
 
 export * from "./auth-mapper";
