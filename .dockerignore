@@ -57,9 +57,6 @@ README.md
 # Design files
 design-htmls
 
-# Mock data
-src/mocks
-
 # Docker
 Dockerfile
 .dockerignore
