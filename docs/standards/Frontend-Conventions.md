@@ -39,7 +39,7 @@ Mọi tệp tin và thư mục trong dự án phải tuân thủ nghiêm ngặt 
 |---|---|---|---|
 | **React Components** | `PascalCase` | `.tsx` | `BookingCard.tsx`, `CourtGrid.tsx`, `SlotPopup.tsx`, `ConfirmDialog.tsx` |
 | **Next.js Pages / Layouts** | `kebab-case` / lowercase | `.tsx` | `page.tsx`, `layout.tsx`, `providers.tsx` |
-| **Next.js API Routes** | lowercase | `.ts` | `src/app/api/chat/route.ts` |
+| **Next.js API Routes** | lowercase | `.ts` | `route.ts` (hiện codebase không còn Route Handler nào) |
 | **Route Groups (Next.js)** | `(kebab-case)` | Thư mục | `(auth)`, `(customer)`, `(admin)` |
 | **Custom Hooks** | `useCamelCase` | `.ts` | `useAuth.ts`, `useBooking.ts`, `useCourt.ts`, `useEmployee.ts` |
 | **Zustand Stores** | `kebab-case.store` | `.ts` | `auth.store.ts`, `booking-cart.store.ts` |
@@ -377,6 +377,33 @@ try {
 - Cấm để lại `console.log` debug trong mã nguồn production.
 - Các handler đang là `TODO` trong quá trình phát triển phải được ghi chú rõ: `// TODO: Implement Modal M-06 (UC-09)`.
 
+### 9.4 Thông điệp lỗi luôn bằng tiếng Việt
+Backend trả `message`/`errors` bằng tiếng Anh, còn lỗi mạng/timeout của `axios` cũng là tiếng Anh. Vì vậy **không được** hiển thị trực tiếp `error.message` hay `error.response.data.message` ra UI.
+
+Toàn bộ thông điệp lỗi đi qua module `src/utils/api-error.ts`:
+
+| Hàm | Dùng khi nào | Kết quả |
+| --- | --- | --- |
+| `getErrorMessage(error)` | Lỗi chung (toast, banner, `isError`) | Dịch `message` của backend qua từ điển; không dịch được thì trả lời theo mã HTTP (400/401/403/404/409/429/5xx…); lỗi mạng/timeout có câu riêng. |
+| `getApiFieldErrors(error)` | Form có nhập liệu | Trả lỗi theo từng field (`{email: "..."}`) để gắn inline dưới input. |
+| `hasApiFieldError(error, field)` | Cần biết backend có báo lỗi field hay không | `boolean`. |
+| `getRetryAfterSeconds(error)` | Lỗi 429 | Số giây chờ lại theo header `Retry-After`. |
+
+```typescript
+// CHUẨN - lỗi trả về từ backend
+catch (error) {
+  toast.error(getErrorMessage(error)); // "Email hoặc mật khẩu không đúng."
+}
+
+// CHUẨN - lỗi theo từng field
+const fieldErrors = getApiFieldErrors(error);
+setError("email", {type: "server", message: fieldErrors.email});
+```
+
+Khi backend thêm message mới, bổ sung vào `MESSAGE_TRANSLATIONS` (hoặc `PATTERN_TRANSLATIONS` nếu message có biến động) trong `src/utils/api-error.ts`; message chưa có trong từ điển sẽ tự động rơi về thông điệp theo mã lỗi HTTP nên không bao giờ lộ tiếng Anh ra UI.
+
+Kiểm tra tự động: `npm run check:api-error`.
+
 ---
 
 ## 10. QUY TRÌNH GIT & KIỂM TRA TRƯỚC KHI COMMIT (PRE-COMMIT CHECKLIST)
@@ -398,6 +425,8 @@ Trước khi tạo Pull Request hoặc hoàn tất công việc, lập trình vi
 - [ ] **Sử dụng đúng hàm tiện ích:** Mọi className ghép nối đều qua hàm `cn()`.
 - [ ] **Định dạng tiền & ngày:** Đã dùng `formatCurrency()`, `formatDate()` / `formatDateTime()`.
 - [ ] **Không hardcode chuỗi API:** Mọi endpoint đều gọi qua Service Layer và `axiosInstance`.
+
+> **Ngoại lệ:** luồng SSE của Trợ lý AI (`src/services/chat.service.ts`) dùng `fetch` vì cần đọc `ReadableStream`; base URL vẫn lấy từ `axiosInstance.defaults.baseURL`, không hardcode chuỗi API.
 
 ---
 

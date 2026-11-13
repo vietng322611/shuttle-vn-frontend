@@ -77,7 +77,7 @@ export function QuickLookupModal({ onClose }: QuickLookupModalProps) {
 
   const handleLookup = (formData: LookupFormData) => {
     if (formData.keyword === submittedKeyword && pageNumber === 1) {
-      refetch();
+      void refetch();
       return;
     }
     setSubmittedKeyword(formData.keyword);
@@ -126,7 +126,11 @@ export function QuickLookupModal({ onClose }: QuickLookupModalProps) {
                 error={errors.keyword?.message}
                 {...register("keyword")}
               />
-              <Button type="submit" className="w-auto" loading={isFetching}>
+              <Button
+                type="submit"
+                className="w-auto h-11 shrink-0"
+                loading={isFetching}
+              >
                 Tra cứu
               </Button>
             </form>
@@ -151,7 +155,7 @@ export function QuickLookupModal({ onClose }: QuickLookupModalProps) {
                   variant="outline"
                   size="sm"
                   className="mx-auto mt-3 inline-flex w-auto"
-                  onClick={() => refetch()}
+                  onClick={() => void refetch()}
                 >
                   Thử lại
                 </Button>

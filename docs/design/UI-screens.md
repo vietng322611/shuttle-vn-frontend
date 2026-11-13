@@ -2,8 +2,8 @@
 
 | Mục | Nội dung |
 |---|---|
-| Phiên bản | 3.1 (thay thế 2.0; đã chốt toàn bộ điểm mở, xem §8) |
-| Cập nhật | 23/10/2026 |
+| Phiên bản | 3.2 (thay thế 3.1; thêm WF-03A Đặt mật khẩu, đảo QĐ-11) |
+| Cập nhật | 01/11/2026 |
 | Mục đích | Đối chiếu từng màn hình giữa **codebase hiện tại** và **chuẩn mục tiêu** (nghiệp vụ SRS/UseCase + Wireframes), làm căn cứ để triển khai UI tiếp theo |
 | Nguồn nghiệp vụ | `ShuttleVNBackend/docs/product/SRS.md`, `UseCase.md` |
 | Nguồn giao diện | `docs/design/Wireframes.md`, `User-Flows.md`, `Design-System.md` |
@@ -30,12 +30,13 @@
 | WF-01 | Đăng ký | Khách | `/register` | `/register` | ⚠ | ✅ `auth/issue-code`, `auth/register` |
 | WF-02 | Đăng nhập | Tất cả | `/login` | `/login` | ⚠ | ✅ `auth/login` |
 | WF-03 | Quên mật khẩu | Khách | — | `/forgot-password` | ❌ | ✅ `auth/issue-code`, `auth/reset-password` |
+| WF-03A | Đặt mật khẩu (liên kết từ email) | Khách | `/set-password` | `/set-password` | ✅ | ✅ `auth/set-password`, `auth/resend-setup-link` |
 | WF-04 | Đặt sân & lưới sân | Khách, vãng lai | `/courts`, `/booking`, `/booking/guest` | `/booking` hoặc `/courts` (giữ `/courts`) | ⚠ | ✅ `courts/grid`, `bookings/price-preview`, `bookings`, `bookings/quick` |
 | WF-05 | Lịch sử đặt sân | Thành viên | `/my-bookings` | `/my-bookings` | ⚠ | ⚠ có `bookings/me`, `PATCH cancel`; ❌ đổi lịch |
 | WF-06 | Tra cứu đơn | Tất cả | `/lookup` | `/lookup` | ⚠ | ❌ FE gọi `bookings/code/{code}`, backend chưa có |
 | WF-07 | Hồ sơ cá nhân | Thành viên | `/profile` | `/profile` | ⚠ | ✅ `profile`, `profile/change-password` |
-| WF-08 | Widget Trợ lý AI | Tất cả | — | widget toàn site | ❌ | route FE `api/chat` có; không có tool |
-| WF-09 | Bảng điều khiển | Admin | `/dashboard` | `/admin/dashboard` | ⚠ | ❌ FE gọi `admin/dashboard/summary`, backend chưa có |
+| WF-08 | Widget Trợ lý AI | Tất cả | — | widget toàn site | ✅ | ✅ `POST /api/assistant/chat/stream` (SSE) |
+| WF-09 | Bảng điều khiển | Admin | `/dashboard` | `/admin/dashboard` | ✅ | ✅ `GET /api/admin/dashboard` |
 | WF-10 | Yêu cầu đặt sân | NV, Admin | — | `/admin/booking-requests` | ❌ | ✅ `booking-requests` (list, confirm, reject) |
 | WF-11 | Chi tiết đặt sân & xử lý | NV, Admin | — | `/admin/bookings/[id]` | ❌ | ⚠ có detail, confirm, reject, complete; ❌ đổi lịch, hoàn tiền |
 | WF-12 | Lịch sân & đặt tại quầy | NV, Admin | `/schedule` | `/admin/court-schedule` | ⚠ | ⚠ có `courts/grid`, status; ❌ đặt thay khách |
@@ -44,7 +45,7 @@
 | WF-15 | Quản lý sân & bảng giá | Admin | `/manage-courts` | `/admin/courts` | ⚠ | ⚠ có CRUD, status, schedule, pricing; ❌ xóa mềm |
 | WF-16 | Nhân viên & Phân quyền | Admin | `/employees` | `/admin/staff`, `/admin/accounts` | ⚠ | ⚠ có CRUD, lock; ❌ đổi vai trò |
 | WF-17 | Đặt sân toàn hệ thống | Admin | — | `/admin/bookings`, hiển thị là tab "Tất cả đặt sân" trong WF-10 (G-23) | ❌ | ✅ `admin/bookings` |
-| WF-18 | Báo cáo & Thống kê | Admin | `/statistics` (placeholder) | `/admin/reports` | ❌ | ⚠ có `statistics/court-usage`; ✅ doanh thu `admin/statistics/revenue` |
+| WF-18 | Báo cáo & Thống kê | Admin | `/statistics` | `/admin/reports` | ✅ | ✅ doanh thu `GET /api/admin/statistics/revenue` + đặt sân `GET /api/admin/statistics/court-usage` |
 | WF-19 | Nhật ký hoạt động | Admin | `/audits` (placeholder) | `/admin/audit-log` | ❌ | ✅ `audits` |
 
 ---
@@ -153,6 +154,7 @@ Quy tắc thực hiện: giữ `(admin)/layout.tsx` (route group vẫn cấp lay
 | Quên mật khẩu | ⚠ | Hiện: link `#`. → Chuẩn: link tới `/forgot-password` |
 | Sai thông tin | ⚠ | Hiện: toast. → Chuẩn: **banner trong form** "Email hoặc mật khẩu không đúng." (không nói sai ở trường nào, không báo số lần còn lại) |
 | Tài khoản bị khóa | ❌ | Chuẩn: **banner khóa** — "Tài khoản đã bị khóa (nhập sai mật khẩu 5 lần liên tiếp hoặc do nhân viên khóa). Vui lòng liên hệ nhân viên qua hotline để được mở khóa. Đặt lại mật khẩu không mở khóa tài khoản." + Hotline. Backend khóa khi sai 5 lần (đã có) |
+| Tài khoản Chờ kích hoạt (UC-42) | ✅ | Backend trả `403` → **banner cảnh báo** (`bg-amber-50`) "Tài khoản chưa được kích hoạt. Vui lòng đặt mật khẩu bằng liên kết đã gửi tới email của bạn (hiệu lực 24 giờ)." + nút **Gửi lại liên kết mới** (đếm lùi theo `Retry-After`, mặc định 60 giây). Không dùng toast |
 | Chuyển hướng | ⚠ | Xem §2.1 |
 
 ### WF-03 Quên mật khẩu
@@ -167,6 +169,20 @@ Luồng 3 bước, tất cả trên một trang: **(1) Nhập email → (2) moda
 | Bước 2 | Cùng quy tắc OTP như WF-01 |
 | Bước 3 | Mật khẩu mới 8–128 ký tự, xác nhận khớp (chỉ kiểm tra ở giao diện, G-07). Phiên hết hạn → quay lại bước 1 kèm thông báo |
 | Bước 4 | Thông báo thành công, nhắc "đặt lại mật khẩu **không mở khóa** tài khoản đang bị khóa", nút **Đăng nhập** |
+
+### WF-03A Đặt mật khẩu (liên kết từ email)
+
+`/set-password?email=…&token=…` · `app/(auth)/set-password/page.tsx`, `components/auth/SetPasswordForm.tsx`, `components/auth/ResendSetupLinkButton.tsx` · UC-42, BR-26
+
+| Hạng mục | Quy tắc |
+|---|---|
+| Truy cập | Công khai (có trong `PUBLIC_PATHS` của `proxy.ts`). Trang không có mục trên thanh điều hướng; chỉ vào bằng liên kết email do nhân viên tạo tài khoản kích hoạt |
+| Đọc liên kết | Đọc `email`, `token` từ query ở máy chủ, **xóa `token` khỏi URL** bằng `history.replaceState`; trang gửi `Referrer-Policy` qua thẻ meta `no-referrer`. Tải lại trang sau khi xóa token → coi là liên kết không hợp lệ (khách bấm Gửi lại liên kết mới) |
+| Trường | Mật khẩu mới, Xác nhận mật khẩu (có Hiện/Ẩn). Mật khẩu 8–128 ký tự, xác nhận phải khớp |
+| Thành công | Toast "Đặt mật khẩu thành công, vui lòng đăng nhập" → chuyển `/login`. Không tự đăng nhập |
+| Liên kết sai/hết hạn/đã dùng (`400`, `errors.Token`) | Thay form bằng khối "Liên kết không hợp lệ hoặc đã hết hạn" + nút **Gửi lại liên kết mới** + liên kết "Đăng nhập" (hồ sơ và lịch sử đặt sân giữ nguyên) |
+| Thiếu `email` hoặc `token` | Hiện thẳng khối liên kết không hợp lệ; thiếu `email` thì không có nút gửi lại |
+| Gửi lại liên kết | Gọi `auth/resend-setup-link`; luôn báo trung tính "Nếu email thuộc tài khoản đang chờ kích hoạt, liên kết mới đã được gửi…". Nút bị vô hiệu và đếm lùi 60 giây sau khi gửi; gặp `429` thì đếm lùi theo header `Retry-After` |
 
 ### WF-04 Đặt sân & lưới sân
 
@@ -244,13 +260,13 @@ Luồng 3 bước, tất cả trên một trang: **(1) Nhập email → (2) moda
 
 ### WF-08 Widget Trợ lý AI
 
-Widget nổi toàn site (góc dưới phải) · UC-13 · **chưa có UI**
+Widget nổi toàn site (góc dưới phải) · UC-13 · **đã có UI**
 
 | Hạng mục | Trạng thái | Hiện trạng → Chuẩn mục tiêu |
 |---|---|---|
-| Giao diện | ❌ | Chưa có component |
-| Route FE `app/api/chat/route.ts` | ⚠ | Hiện: gọi Anthropic với system prompt cố định, **không có tool/function** để đọc lịch hay giá. Hợp đồng không khớp type `ChatRequest/ChatResponse` (route nhận `{messages}` trả `{message}`) |
-| Phạm vi hiển thị | — | Hiện trên **mọi trang Cổng Khách hàng**, **ẩn ở Cổng Quản trị** (G-11, giả định) |
+| Giao diện | ✅ | `components/chatbot/` (`ChatWidget`, `ChatPanel`, `ChatMessageItem`, `ChatQuickPrompts`), gắn ở `(customer)/layout.tsx` |
+| Kết nối Backend | ✅ | `chat.service.ts` gọi `POST /api/assistant/chat/stream` (SSE); FE không còn route Next gọi nhà cung cấp AI |
+| Phạm vi hiển thị | ✅ | Hiện trên **mọi trang Cổng Khách hàng**, **ẩn ở Cổng Quản trị** và với Nhân viên, Quản trị viên (G-11) |
 | Chuẩn | — | Banner cố định: "AI chỉ tư vấn thông tin công khai; KHÔNG thể đặt, hủy, đổi sân, thu tiền hay xem dữ liệu cá nhân." Gợi ý nhanh: Hướng dẫn đặt sân · Giá theo giờ · Gợi ý giờ còn trống · Hotline. Không có thông tin → "Vui lòng liên hệ nhân viên: {Hotline}". Giá nêu là **tham khảo**, kiểm tra lại khi đặt |
 
 ---
@@ -259,15 +275,15 @@ Widget nổi toàn site (góc dưới phải) · UC-13 · **chưa có UI**
 
 ### WF-09 Bảng điều khiển
 
-`/dashboard` → `/admin/dashboard` (chỉ Admin) · `app/(admin)/dashboard/DashboardClient.tsx`, `components/admin/DashboardStats.tsx`, `RevenueChart.tsx` · X-02, G-14
+`/dashboard` → `/admin/dashboard` (chỉ Admin) · `app/(admin)/dashboard/DashboardClient.tsx`, `components/admin/DashboardStats.tsx` · X-02, G-14
 
 | Hạng mục | Trạng thái | Hiện trạng → Chuẩn mục tiêu |
 |---|---|---|
-| Thẻ chỉ số | ⚠ | Hiện **4 thẻ**: Doanh thu hôm nay · Đặt sân hôm nay · Chờ xác nhận · **Tỷ lệ lấp đầy**. → Chuẩn: **3 thẻ** — **Doanh thu hôm nay** (hóa đơn Đã thanh toán, tính theo thời điểm thu) · **Đơn chờ duyệt** · **Lượt sân đặt trong ngày** (ngày sử dụng = hôm nay, **không tính Đã hủy**). **Bỏ "Tỷ lệ lấp đầy"**. Theo bảng 9.2 và khung 9.1 (`QĐ-09`); đoạn chú thích đầu mục WF-09 trong Wireframes ghi "Đơn hoàn thành hôm nay" là sai lệch nội bộ của Wireframes |
-| Danh sách cần xử lý | ⚠ | Hiện: danh sách "Chờ xác nhận" chỉ có tên, sân, giờ; nút "Xem tất cả →" **chưa có sự kiện**; mỗi dòng ghi cố định "Hôm nay". → Chuẩn: "Đơn cần xử lý gấp" — đơn Chờ xác nhận, **giờ chơi gần nhất trước** (tiêu chí "gấp" là đề xuất, G-14); nút **Chi tiết** → WF-11; bấm thẻ "Đơn chờ duyệt" → WF-10. Rỗng: "Không có yêu cầu nào đang chờ xác nhận."; mỗi thẻ có thể lỗi độc lập |
-| Biểu đồ 7 ngày, bảng "Đặt sân gần đây" | ⚠ | **Gỡ khỏi dashboard** (`QĐ-06`): Wireframes G-14 không vẽ; doanh thu theo kỳ thuộc WF-18 (tái dùng `RevenueChart` tại đó); danh sách đặt sân thuộc WF-10/WF-17; API tương ứng cũng chưa có |
-| Nhãn trạng thái | ⚠ | `STATUS_LABELS` khai báo lại cục bộ → dùng `BOOKING_STATUS_LABEL` trong `config/app.ts` |
-| API | ❌ | `dashboardService` gọi `admin/dashboard/summary`; backend chưa có (hiện chạy bằng mock) |
+| Thẻ chỉ số | ✅ | **3 thẻ** — **Doanh thu hôm nay** (hóa đơn Đã thanh toán, tính theo thời điểm thu) · **Đơn chờ duyệt** · **Lượt sân đặt trong ngày** (ngày sử dụng = hôm nay, **không tính Đã hủy**). Không có "Tỷ lệ lấp đầy". Theo bảng 9.2 và khung 9.1 (`QĐ-09`) |
+| Danh sách cần xử lý | ✅ | "Đơn cần xử lý gấp" — đơn Chờ xác nhận, **giờ chơi gần nhất trước** (G-14); nút **Chi tiết** mở modal `BookingDetailModal`; bấm thẻ "Đơn chờ duyệt" → `/booking-requests`; nút "Xem tất cả →" dẫn tới `/booking-requests`. Rỗng: "Không có đơn chờ xác nhận" |
+| Biểu đồ 7 ngày, bảng "Đặt sân gần đây" | ✅ | **Đã gỡ khỏi dashboard** (`QĐ-06`): Wireframes G-14 không vẽ; doanh thu theo kỳ thuộc WF-18; danh sách đặt sân thuộc WF-10/WF-17 |
+| Nhãn trạng thái | ✅ | Dùng `BOOKING_STATUS_LABEL` trong `config/app.ts` |
+| API | ✅ | `GET /api/admin/dashboard` (AdminOnly) |
 
 ### WF-10 Yêu cầu đặt sân (chờ xác nhận)
 
@@ -369,16 +385,16 @@ Route mục tiêu `/admin/bookings/[id]` · **chưa có route** · UC-15, UC-16,
 
 ### WF-14 Quản lý khách hàng
 
-`/customers` → `/admin/customers` (Admin + Nhân viên) · `app/(admin)/customers/CustomersClient.tsx` · UC-24, UC-26 (hoãn), UC-27, UC-30, X-06
+`/customers` → `/admin/customers` (Admin + Nhân viên) · `app/(admin)/customers/CustomersClient.tsx` · UC-24, UC-26, UC-27, UC-30, UC-42, X-06
 
 | Hạng mục | Trạng thái | Hiện trạng → Chuẩn mục tiêu |
 |---|---|---|
 | Tìm kiếm | ❌ | Chuẩn: ô tìm theo họ tên/SĐT/email + nút Tìm (backend hỗ trợ `keyword`). SĐT không dùng để gộp hồ sơ. Tìm theo mã đặt sân (UC-30) chưa vẽ (G-26) |
-| Cột | ⚠ | Hiện: Khách hàng (tên + id) · Liên hệ · **Loại (Thành viên/Vãng lai)** · Ngày đăng ký · Thao tác. → Chuẩn: Mã KH · Họ tên · SĐT · Email · **Trạng thái tài khoản** (Hoạt động / Bị khóa / "—" nếu chưa có tài khoản). Backend trả sẵn `hasAccount`, `accountStatus`. Bỏ cột "Loại" và "Ngày đăng ký" (không có trong wireframe); "—" thay cho nhãn Vãng lai |
-| Thao tác | ❌ | Hiện: nút **Chi tiết không có sự kiện**. → Chuẩn: **Xem lịch sử đặt sân** (modal, API `customers/{id}/bookings`; mã đơn → WF-11) · **Khóa tài khoản** (khách `Active`) · **Mở khóa tài khoản** (khách `Disabled`, đưa bộ đếm sai về 0, áp dụng cả khóa tự động lần sai thứ 5), có modal xác nhận. Khách chưa có tài khoản: cột trạng thái "—", **không có** nút Khóa/Mở khóa (G-20) |
+| Cột | ⚠ | Hiện: Khách hàng (tên + id) · Liên hệ · **Loại (Thành viên/Vãng lai)** · Ngày đăng ký · Thao tác. → Chuẩn: Mã KH · Họ tên · SĐT · Email · **Trạng thái tài khoản** (Hoạt động / Chờ kích hoạt / Bị khóa / "—" nếu chưa có tài khoản). Backend trả sẵn `hasAccount`, `accountStatus`. Bỏ cột "Loại" và "Ngày đăng ký" (không có trong wireframe); "—" thay cho nhãn Vãng lai |
+| Thao tác | ❌ | Hiện: nút **Chi tiết không có sự kiện**. → Chuẩn: **Xem lịch sử đặt sân** (modal, API `customers/{id}/bookings`; mã đơn → WF-11) · **Khóa tài khoản** (khách `Active`) · **Mở khóa tài khoản** (khách `Disabled`, đưa bộ đếm sai về 0, áp dụng cả khóa tự động lần sai thứ 5), có modal xác nhận. Khách chưa có tài khoản: cột trạng thái "—", **không có** nút Khóa/Mở khóa (G-20). Khách `PendingActivation` (Chờ kích hoạt): hiện nhãn "Chờ kích hoạt", **không có** nút Khóa/Mở khóa (backend trả `409`) |
 | Phạm vi khóa/mở khóa | — | Màn hình này **chỉ thao tác tài khoản khách hàng**; không khóa được tài khoản nhân viên/quản trị (việc đó ở WF-16B). Không có: xóa hồ sơ khách đã giao dịch, sửa email |
 | Sửa họ tên/SĐT khách | ❌ | UC-24 cho phép nhưng Wireframes **chưa vẽ** (G-19) → chưa triển khai cho tới khi chốt |
-| Nút "Thêm khách hàng" | ⚠ | **Gỡ nút** (`QĐ-11`): hồ sơ khách được tạo tự động khi đăng ký hoặc khi đặt sân theo email (BR-10, UC-20); UC-26 (tạo tài khoản khách) đang hoãn (X-06); khung 14.1 không vẽ nút này |
+| Nút "Thêm khách hàng" | ✅ | **Giữ nút** (`QĐ-11`, đã đảo): mở modal nhập họ tên, SĐT, email (UC-26). Hệ thống tạo tài khoản ở trạng thái Chờ kích hoạt và gửi email liên kết thiết lập mật khẩu hiệu lực 24 giờ; không nhập mật khẩu (X-06). Toast "Đã tạo tài khoản và gửi email thiết lập mật khẩu cho khách hàng". Gửi email lỗi → không tạo tài khoản, báo lỗi |
 | Phân trang | ❌ | Chỉ lấy trang mặc định, chưa có điều khiển trang. Chuẩn: "Hiển thị x–y / tổng", mỗi trang 20 |
 | Rỗng | ❌ | "Không tìm thấy khách hàng nào." |
 
@@ -418,7 +434,7 @@ Admin · UC-36…UC-39, UC-27, BR-15, BR-17. Chuẩn tách **hai màn hình** (G
 
 | Hạng mục | Quy tắc |
 |---|---|
-| Tab | "Nhân viên & Quản trị viên" · "Khách hàng có tài khoản" (khách: chỉ khóa/mở khóa/xóa; **không có nút thêm tài khoản khách**, UC-26 hoãn) |
+| Tab | "Nhân viên & Quản trị viên" · "Khách hàng có tài khoản" (khách: chỉ khóa/mở khóa/xóa; **không có nút thêm tài khoản khách** ở tab này — tạo tài khoản khách làm ở WF-14, UC-26) |
 | Cột | Họ tên · Email · Vai trò · Trạng thái |
 | **Đổi vai trò** | Modal: Nhân viên ↔ Quản trị viên (không đổi loại hồ sơ Khách ↔ Nhân viên). Backend **chưa có API đổi vai trò** |
 | Khóa / Mở khóa | Admin thao tác mọi loại tài khoản; chỉ Admin mở khóa tài khoản nội bộ |
@@ -438,15 +454,15 @@ Route `/admin/bookings`, hiển thị là tab "Tất cả đặt sân" cạnh ta
 
 ### WF-18 Báo cáo & Thống kê
 
-`/statistics` → `/admin/reports` · hiện **placeholder** ("Chức năng thống kê báo cáo đang được phát triển.") · UC-41, UC-42
+`/statistics` → `/admin/reports` · UC-38, UC-39
 
 | Hạng mục | Quy tắc |
 |---|---|
 | Bộ lọc | Từ ngày – Đến ngày · Nhóm theo **Ngày / Tháng** · **Xem báo cáo** |
-| Doanh thu (UC-41) | Chỉ hóa đơn **Đã thanh toán hợp lệ**, tính theo **thời điểm thu**. Bảng: Kỳ · Số hóa đơn đã thu · Doanh thu; có dòng **Tổng** và biểu đồ cột. Ghi chú: hoàn tiền sau đó có thể làm đổi doanh thu kỳ cũ |
-| Đặt sân (UC-42) | Theo **ngày sử dụng**, **không tính Đã hủy**. Bảng: Kỳ · Lượt đặt · Giờ đặt · Lượt hoàn thành · Giờ hoàn thành; có dòng Tổng |
-| Không có | **Tỷ lệ lấp đầy**, xuất báo cáo (backend `court-usage` còn trả `occupancyRate` — không hiển thị) |
-| API | ⚠ Có `statistics/court-usage`; ✅ doanh thu: `GET /api/admin/statistics/revenue?fromDate=&toDate=&groupBy=Day hoặc Month` (AdminOnly) || ⚠ Chỉ có `statistics/court-usage`; **chưa có** thống kê doanh thu theo kỳ |
+| Doanh thu (UC-38) | Chỉ hóa đơn **Đã thanh toán hợp lệ**, tính theo **thời điểm thu**. Bảng: Kỳ · Số hóa đơn đã thu · Doanh thu; có dòng **Tổng** và biểu đồ cột. Ghi chú: hoàn tiền sau đó có thể làm đổi doanh thu kỳ cũ |
+| Đặt sân (UC-39) | Theo **ngày sử dụng**, **không tính Đã hủy**. Bảng: Kỳ · Lượt đặt · Giờ đặt · Lượt hoàn thành · Giờ hoàn thành; có dòng Tổng |
+| Không có | **Tỷ lệ lấp đầy**, xuất báo cáo, phân bố theo giờ |
+| API | ✅ `GET /api/admin/statistics/revenue` và `GET /api/admin/statistics/court-usage` (`fromDate`, `toDate`, `groupBy`) |
 
 ### WF-19 Nhật ký hoạt động
 
@@ -508,7 +524,7 @@ Mã giữ đúng Wireframes; "—" là hộp thoại chưa có mã riêng. Phụ
 | 2 | Tồn tại `WalkInBookingForm.tsx` (email tùy chọn) | Không có file này; đặt nhanh dùng `/booking/guest`, **email bắt buộc** (KH-11, BR-10) |
 | 3 | Chi tiết/Hủy/Đổi lịch là `console.log` | Chi tiết, Hủy, Hóa đơn đã chạy; chỉ **Đổi lịch** chưa có |
 | 4 | Hủy bắt buộc nhập lý do | Wireframes `M-06` không có ô lý do; FE gửi lý do hệ thống |
-| 5 | Dashboard 3 thẻ gồm "Đơn hoàn thành hôm nay" | Chuẩn: Doanh thu hôm nay · Đơn chờ duyệt · Lượt sân đặt trong ngày; code hiện 4 thẻ có "Tỷ lệ lấp đầy" |
+| 5 | Dashboard 3 thẻ gồm "Đơn hoàn thành hôm nay" | Chuẩn: Doanh thu hôm nay · Đơn chờ duyệt · Lượt sân đặt trong ngày (đã triển khai chuẩn 3 thẻ) |
 | 6 | Admin 9 mục / "4 nhóm", có "Đặt sân toàn hệ thống" | Admin **10 mục**; không có mục "Đặt sân toàn hệ thống" (là tab); thêm "Tài khoản & Phân quyền" |
 | 7 | WF-10 có bộ lọc sân/ngày/loại khách | Không có trong Wireframes |
 | 7b | WF-14 nhân viên chỉ mở khóa tài khoản | Khóa **và** mở khóa, nhưng chỉ tài khoản **khách hàng** |
@@ -518,7 +534,7 @@ Mã giữ đúng Wireframes; "—" là hộp thoại chưa có mã riêng. Phụ
 | 11 | Tra cứu hiển thị trạng thái thanh toán | Code **chưa hiển thị**; chuẩn bắt buộc có |
 | 12 | Tab Đổi mật khẩu "tạm ẩn nếu chưa có backend" | Wireframes G-02 vẽ tạm ẩn vì thiếu UC (O-06); backend nay **đã có** `profile/change-password` → **giữ hiển thị** (`QĐ-12`) |
 | 13 | `DashboardStats` ở `components/dashboard/` | Thực tế `components/admin/DashboardStats.tsx` |
-| 14 | Chat dùng function-calling server-side | Route chỉ gọi Anthropic với system prompt cố định, không có tool |
+| 14 | Chat dùng function-calling server-side | Đã xử lý: widget gọi Backend `POST /api/assistant/chat/stream`; Backend gọi tool `list_courts`, `get_court_availability`; route Next gọi trực tiếp nhà cung cấp AI đã xóa |
 | 15 | URL admin ghi `/admin/...` nhưng đường dẫn file `(admin)/...` | Route group không sinh `/admin`; đã chốt chuyển sang `/admin/*` (`QĐ-01`, §2.6) |
 | 16 | Đánh lại mã modal M-01…M-19 | Trùng mã với Wireframes → dùng đúng mã Wireframes |
 
@@ -541,9 +557,9 @@ Mã giữ đúng Wireframes; "—" là hộp thoại chưa có mã riêng. Phụ
 | P2 | WF-13 Thanh toán (chờ API) · WF-18 · WF-19 · WF-17 | |
 | P2 | Dashboard: 3 thẻ + danh sách cần xử lý; gỡ biểu đồ và bảng đặt sân gần đây | WF-09 |
 | P2 | Form sân có Xem trước, xóa mềm sân, đổi vai trò, tách WF-16B | WF-15, 16 |
-| P2 | Footer Hotline cấu hình, widget AI | §2.2, WF-08 |
+| P2 | Footer Hotline cấu hình | §2.2 |
 | Dọn mã | Xóa `menuOpen`, `showDeactivateModal`, mô tả sân giả, mục "Đặt của bạn" chết (cho tới khi backend trả `isMine`) | — |
-| Dọn giao diện | Gỡ nút/modal Hóa đơn phía khách, upload avatar + thẻ thống kê hồ sơ, nút "Thêm khách hàng", thẻ thống kê trang nhân viên, trường "Lý do" ở modal đổi trạng thái sân | WF-05, 07, 14, 16A, 12 |
+| Dọn giao diện | Gỡ nút/modal Hóa đơn phía khách, upload avatar + thẻ thống kê hồ sơ, thẻ thống kê trang nhân viên, trường "Lý do" ở modal đổi trạng thái sân | WF-05, 07, 14, 16A, 12 |
 
 ---
 
@@ -565,7 +581,7 @@ Nguyên tắc chốt: (1) SRS/UseCase thắng mọi tài liệu khác; (2) nếu
 | QĐ-08 | Thẻ thống kê ở trang nhân viên | Bỏ | G-21: SRS/UC chưa có thẻ số liệu |
 | QĐ-09 | Thẻ chỉ số thứ hai của dashboard | "Đơn chờ duyệt" (thẻ 2) và "Lượt sân đặt trong ngày" (thẻ 3), theo bảng 9.2 và khung 9.1 | Bảng chi tiết và wireframe nhất quán nhau; "Đơn hoàn thành hôm nay" chỉ xuất hiện ở đoạn chú thích |
 | QĐ-10 | Chức năng chưa có API backend | UI làm theo hợp đồng ở §8.2; chức năng chưa có API thì ẩn nút hoặc hiện "Chưa khả dụng", **không dùng dữ liệu mock trong môi trường chạy thật** | Tránh hiển thị số liệu giả như đang hoạt động |
-| QĐ-11 | Nút "Thêm khách hàng" | Gỡ nút | Hồ sơ khách tạo tự động khi đăng ký/đặt sân (BR-10, UC-20); UC-26 hoãn (X-06) |
+| QĐ-11 | Nút "Thêm khách hàng" | Giữ nút; tạo tài khoản Chờ kích hoạt + gửi email thiết lập mật khẩu | UC-26 được triển khai theo UC-42 (backend 2.1); thay quyết định cũ "Gỡ nút" vì UC-26 từng hoãn (X-06) |
 | QĐ-12 | Tab Đổi mật khẩu | Giữ hiển thị; bổ sung vào UC-12 | Backend đã có API; chức năng bảo mật cần thiết; Wireframes chỉ tạm ẩn vì chưa có backend |
 
 Các điểm Wireframes tự mâu thuẫn đã được xử lý theo bảng trên: chú thích "che tên khách" (QĐ-04), chú thích dashboard "Đơn hoàn thành hôm nay" (QĐ-09), ghi chú "Hiện trạng Codebase" lỗi thời (§0).
@@ -588,5 +604,5 @@ Tên endpoint là đề xuất; backend có thể đặt tên khác, miễn gi�
 | Đổi vai trò (WF-16B) | `PATCH /api/employees/{id}/role` (AdminOnly) | Bảo vệ Admin `Active` cuối cùng; cho phép khóa/xóa Admin khác (hiện chặn mọi Admin) |
 | Xóa tài khoản khách (WF-16B) | `DELETE /api/accounts/{id}` (AdminOnly) | BR-15: hard-delete tài khoản, giữ hồ sơ, đơn, hóa đơn, nhật ký |
 | Dashboard (WF-09) | `GET /api/admin/dashboard` | 3 chỉ số + danh sách đơn Chờ xác nhận, giờ chơi gần nhất trước |
-| Báo cáo (WF-18) | `GET /api/admin/statistics/revenue?fromDate=&toDate=&groupBy=Day hoặc Month` (đã có), `GET /api/statistics/bookings?...` | Doanh thu theo thời điểm thu; đặt sân theo ngày sử dụng, loại Đã hủy; không trả tỷ lệ lấp đầy |
+| Báo cáo (WF-18) | `GET /api/admin/statistics/revenue?fromDate=&toDate=&groupBy=Day hoặc Month` (đã có), `GET /api/admin/statistics/court-usage?fromDate=&toDate=&groupBy=Day hoặc Month` | Doanh thu theo thời điểm thu; đặt sân theo ngày sử dụng, loại Đã hủy; không trả tỷ lệ lấp đầy |
 | Đổi mật khẩu (WF-07) | Đã có `PUT /api/profile/change-password` | Bổ sung giới hạn 8–128 ở máy chủ nếu chưa có |

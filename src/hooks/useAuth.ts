@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authService } from "@/services";
 import { useAuthStore } from "@/stores/auth.store";
-import { CodeType, LoginRequest, RegisterRequest } from "@/types";
-import { mapAccountToAuthUser } from "@/utils";
+import {
+  CodeType,
+  LoginRequest,
+  RegisterRequest,
+  ResendSetupLinkRequest,
+  SetPasswordRequest,
+} from "@/types";
+import { getErrorMessage, mapAccountToAuthUser } from "@/utils";
 
 export function useAuth() {
   const router = useRouter();
@@ -43,8 +49,23 @@ export function useAuth() {
     },
   });
 
+  const setPasswordMutation = useMutation({
+    mutationFn: (payload: SetPasswordRequest) =>
+      authService.setPassword(payload),
+    onSuccess: () => {
+      toast.success("Đặt mật khẩu thành công, vui lòng đăng nhập");
+      router.push("/login");
+    },
+  });
+
+  const resendSetupLinkMutation = useMutation({
+    mutationFn: (payload: ResendSetupLinkRequest) =>
+      authService.resendSetupLink(payload),
+  });
+
   const logoutMutation = useMutation({
     mutationFn: () => authService.logout(),
+    onError: (error) => toast.error(getErrorMessage(error)),
     onSettled: () => {
       clearAuth();
       queryClient.clear();
@@ -66,6 +87,10 @@ export function useAuth() {
     registerError: registerMutation.error,
     sendVerificationCode: (email: string, type: CodeType) =>
       authService.sendVerificationCode({ email, type }),
+    setPassword: setPasswordMutation.mutate,
+    isSettingPassword: setPasswordMutation.isPending,
+    resendSetupLink: resendSetupLinkMutation.mutate,
+    isResendingSetupLink: resendSetupLinkMutation.isPending,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
   };
