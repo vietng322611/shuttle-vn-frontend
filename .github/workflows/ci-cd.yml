@@ -1,0 +1,121 @@
+name: CI/CD
+
+# Runs on push to devops only. A self-hosted runner must never be reachable
+# from a fork pull request on a public repository, so pull_request and
+# pull_request_target triggers are deliberately absent.
+on:
+  push:
+    branches: [devops]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
+      - "tsconfig.json"
+      - "tailwind.config.mts"
+      - "postcss.config.js"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  verify:
+    name: Type-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run type-check
+
+  image:
+    name: Build and push image
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compute image tag
+        id: meta
+        run: echo "tag=${REGISTRY}/${IMAGE_NAME,,}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to public EC2
+    needs: image
+    runs-on: [self-hosted, public_ec2-runner]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull and restart
+        env:
+          SHUTTLEVN_FRONTEND_IMAGE: ${{ needs.image.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd /opt/shuttlevn/frontend
+          echo "$(date -Is) deploying ${SHUTTLEVN_FRONTEND_IMAGE}" >> deploy.log
+          echo "SHUTTLEVN_FRONTEND_IMAGE=${SHUTTLEVN_FRONTEND_IMAGE}" > .env
+          docker pull "$SHUTTLEVN_FRONTEND_IMAGE"
+          SHUTTLEVN_FRONTEND_IMAGE="$SHUTTLEVN_FRONTEND_IMAGE" docker compose up -d --remove-orphans
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login)" = "200" ]; then
+              echo "healthy after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::frontend did not become healthy within 150s"
+          cd /opt/shuttlevn/frontend
+          docker compose logs --tail 100 frontend >> deploy.log
+          exit 1
+
+      - name: Record deployed tag
+        if: always()
+        run: |
+          cd /opt/shuttlevn/frontend
+          docker inspect shuttlevn-frontend --format '{{.Config.Image}}' >> deploy.log || true

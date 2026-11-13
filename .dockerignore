@@ -26,6 +26,10 @@ dist
 *.pem
 .vscode
 .idea
+docs
+design-htmls
+.temp
+.github
 
 # Local env files
 .env

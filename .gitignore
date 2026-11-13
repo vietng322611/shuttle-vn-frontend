@@ -60,3 +60,5 @@ design-htmls/
 
 # Sonarqube
 .scannerwork/
+
+.temp/
