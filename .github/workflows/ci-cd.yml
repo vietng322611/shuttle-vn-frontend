@@ -34,7 +34,7 @@ env:
 
 jobs:
   verify:
-    name: Type-check
+    name: Verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,14 +49,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
-      # sonar-project.properties already carries the project key, organization
-      # and sources. SonarQube Cloud's free plan refuses Quality Gate lookups
-      # outside the default branch, so the gate is only awaited on main.
+      # Sources live in sonar-project.properties; the key and organization are
+      # derived so no owner handle is pinned in either file. SonarQube Cloud's
+      # free plan refuses Quality Gate lookups outside the default branch, so
+      # the gate is only awaited on main.
       - uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args: ${{ github.ref == 'refs/heads/main' && '-Dsonar.qualitygate.wait=true' || '' }}
+          args: >-
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            ${{ github.ref == 'refs/heads/main' && '-Dsonar.qualitygate.wait=true' || '' }}
 
   image:
     name: Build and push image
