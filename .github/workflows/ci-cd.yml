@@ -1,13 +1,14 @@
 name: CI/CD
 
-# Runs on push to devops only. A self-hosted runner must never be reachable
+# Runs on push to main only. A self-hosted runner must never be reachable
 # from a fork pull request on a public repository, so pull_request and
 # pull_request_target triggers are deliberately absent.
 on:
   push:
-    branches: [devops]
+    branches: [main]
     paths:
       - "src/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "next.config.ts"
