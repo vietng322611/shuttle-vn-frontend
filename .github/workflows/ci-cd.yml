@@ -16,6 +16,7 @@ on:
       - "postcss.config.js"
       - "Dockerfile"
       - ".dockerignore"
+      - "sonar-project.properties"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -37,13 +38,24 @@ jobs:
     permissions:
       contents: read
     steps:
+      # The scanner needs history to attribute issues to the right commit.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run type-check
+      # sonar-project.properties already carries the project key, organization
+      # and sources. SonarQube Cloud's free plan refuses Quality Gate lookups
+      # outside the default branch, so the gate is only awaited on main.
+      - uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: ${{ github.ref == 'refs/heads/main' && '-Dsonar.qualitygate.wait=true' || '' }}
 
   image:
     name: Build and push image
