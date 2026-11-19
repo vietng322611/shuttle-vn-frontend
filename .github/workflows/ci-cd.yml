@@ -18,12 +18,14 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - "sonar-project.properties"
-      - ".github/workflows/**"
+      # Only this workflow, not .github/workflows/**: editing another workflow
+      # must not rebuild and redeploy the frontend image.
+      - ".github/workflows/ci-cd.yml"
   workflow_dispatch:
 
 concurrency:
   group: ci-cd-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
